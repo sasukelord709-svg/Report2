@@ -5,7 +5,7 @@
   "env": {
     "API_ID": { "description": "Your Telegram API ID" },
     "API_HASH": { "description": "Your Telegram API HASH" },
-    "NUMBER_OF_REPORTS": { "description": "How many reports to send", "value": "3" },
+    "NUMBER_OF_REPORTS": { "description": "How many reports to send", "value": "500" },
     "SESSION_1": { "description": "Pyrogram session string 1" },
     "SESSION_2": { "description": "Pyrogram session string 2 (optional)" },
     "SESSION_3": { "description": "Pyrogram session string 3 (optional)" },
