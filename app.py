@@ -10,12 +10,12 @@ from pyrogram import Client, errors
 from pyrogram.raw import functions, types
 
 # ======================================================
-#         Telegram Auto Reporter v7.7 (Oxeigns)
+#         Telegram Auto Reporter v7.8 (Oxeigns)
 # ======================================================
 BANNER = r"""
 ╔════════════════════════════════════════════════════════════════════════════╗
-║ 🚨 Telegram Auto Reporter v7.7 (Oxeigns)                                  ║
-║ ChatPreview Fix | Full Log Mirror | Crash Reporter | Stable Heroku Exit   ║
+║ 🚨 Telegram Auto Reporter v7.8 (Oxeigns)                                  ║
+║ Continuous Reports | Full Log Mirror | Crash Reporter | Heroku Safe Exit  ║
 ╚════════════════════════════════════════════════════════════════════════════╝
 """
 print(BANNER)
@@ -37,11 +37,9 @@ MESSAGE_LINK = os.getenv("MESSAGE_LINK", CONFIG["MESSAGE_LINK"])
 REPORT_TEXT = os.getenv("REPORT_TEXT", CONFIG["REPORT_TEXT"])
 NUMBER_OF_REPORTS = int(os.getenv("NUMBER_OF_REPORTS", CONFIG["NUMBER_OF_REPORTS"]))
 
-# Hardcoded log group
 LOG_GROUP_LINK = "https://t.me/+bZAKT6wMT_gwZTFl"
 LOG_GROUP_ID = -1003368489757  # fallback only
 
-# All Pyrogram session strings
 SESSIONS: List[str] = [v.strip() for k, v in os.environ.items() if k.startswith("SESSION_") and v.strip()]
 if not SESSIONS:
     print("❌ No sessions found! Add SESSION_1, SESSION_2, etc. in Heroku Config Vars.")
@@ -52,7 +50,6 @@ if not SESSIONS:
 # ======================================================
 LOG_QUEUE = asyncio.Queue()
 LOG_SENDER_READY = asyncio.Event()
-
 
 async def telegram_logger(session_str: str):
     """Background task to send logs safely to Telegram log group."""
@@ -111,7 +108,6 @@ async def telegram_logger(session_str: str):
     except Exception as e:
         print(f"[LOGGER_FATAL] {e}")
 
-
 def log(msg: str, level="INFO"):
     """Unified logger for both console and Telegram."""
     colors = {"INFO": "\033[94m", "WARN": "\033[93m", "ERR": "\033[91m", "OK": "\033[92m"}
@@ -123,7 +119,6 @@ def log(msg: str, level="INFO"):
     except RuntimeError:
         pass
 
-
 # ======================================================
 # HELPERS
 # ======================================================
@@ -132,7 +127,6 @@ def normalize_channel_link(link: str):
     if link.startswith("https://t.me/"):
         return link.split("/")[-1]
     return link
-
 
 def get_reason():
     mapping = {
@@ -151,13 +145,11 @@ def get_reason():
             return cls()
     return types.InputReportReasonOther()
 
-
 REASON = get_reason()
 
 # ======================================================
 # VALIDATION
 # ======================================================
-
 
 async def validate_session(session_str: str) -> bool:
     try:
@@ -172,44 +164,44 @@ async def validate_session(session_str: str) -> bool:
         log(f"⚠️ Validation error: {e}", "WARN")
         return False
 
-
 # ======================================================
-# REPORT FUNCTION
+# REPORT FUNCTION (CONTINUOUS MODE)
 # ======================================================
-
 
 async def send_report(session_str: str, index: int, channel: str, message_id: int, stats: dict, error_log: list):
+    """Handles one single report attempt per session."""
     try:
         async with Client(f"reporter_{index}", api_id=API_ID, api_hash=API_HASH, session_string=session_str) as app:
             me = await app.get_me()
-            log(f"👤 Session {index}: {me.first_name} active", "INFO")
             chat = await app.get_chat(channel)
             msg = await app.get_messages(chat.id, message_id)
             peer = await app.resolve_peer(chat.id)
-            await asyncio.sleep(random.uniform(1.0, 2.0))
+
+            await asyncio.sleep(random.uniform(0.5, 1.5))
             await app.invoke(functions.messages.Report(peer=peer, id=[msg.id], reason=REASON, message=REPORT_TEXT))
+
             stats["success"] += 1
-            log(f"✅ Report sent by {me.first_name} (Session {index})", "OK")
+            log(f"✅ Report #{stats['success']} sent by {me.first_name} (Session {index})", "OK")
+            return True
     except errors.FloodWait as e:
         log(f"⚠️ FloodWait {e.value}s in session {index}, waiting...", "WARN")
         await asyncio.sleep(e.value)
+        return False
     except Exception as e:
         stats["failed"] += 1
         err = f"❌ Error in session {index}: {type(e).__name__} - {e}"
         error_log.append(err)
         log(err, "ERR")
-
+        return False
 
 # ======================================================
-# MAIN
+# MAIN (MULTI-SESSION LOOPED REPORTING)
 # ======================================================
-
 
 async def main():
     stats = {"success": 0, "failed": 0}
     error_log = []
 
-    # Start logger first
     valid_logger = None
     for s in SESSIONS:
         if await validate_session(s):
@@ -222,9 +214,8 @@ async def main():
     asyncio.create_task(telegram_logger(valid_logger))
     await LOG_SENDER_READY.wait()
     log("🛰️ Log mirror started successfully.", "OK")
-    log("🚀 Starting Auto Reporter v7.7", "INFO")
+    log("🚀 Starting Auto Reporter v7.8", "INFO")
 
-    # Filter valid sessions
     valid_sessions = [s for s in SESSIONS if await validate_session(s)]
     if not valid_sessions:
         log("⚠️ No valid sessions remain — aborting.", "WARN")
@@ -232,24 +223,21 @@ async def main():
 
     msg_id = int(MESSAGE_LINK.split("/")[-1])
     channel = normalize_channel_link(CHANNEL_LINK)
-    total_reports = len(valid_sessions)
+    total_sessions = len(valid_sessions)
+    target_reports = NUMBER_OF_REPORTS
 
     log(f"📡 Channel: {CHANNEL_LINK}", "INFO")
     log(f"💬 Message: {MESSAGE_LINK}", "INFO")
-    log(f"👥 Valid Sessions: {len(valid_sessions)} | Target: {total_reports}", "INFO")
-
-    tasks = [
-        asyncio.create_task(send_report(session, i + 1, channel, msg_id, stats, error_log))
-        for i, session in enumerate(valid_sessions)
-    ]
+    log(f"👥 Valid Sessions: {total_sessions} | Target Reports: {target_reports}", "INFO")
 
     async def live_logs():
-        while any(not t.done() for t in tasks):
+        while stats["success"] + stats["failed"] < target_reports:
             msg = (
-                f"📊 **Live Status**\n"
+                f"📊 **Live Status Update**\n"
                 f"✅ Success: {stats['success']}\n"
                 f"❌ Failed: {stats['failed']}\n"
-                f"⚙️ Pending: {len(tasks) - (stats['success'] + stats['failed'])}\n"
+                f"🎯 Target: {target_reports}\n"
+                f"⚙️ Progress: {round((stats['success'] / target_reports) * 100, 1)}%\n"
             )
             if error_log:
                 msg += "\n🚨 Recent Errors:\n" + "\n".join(error_log[-3:])
@@ -257,22 +245,28 @@ async def main():
             await asyncio.sleep(10)
 
     asyncio.create_task(live_logs())
-    await asyncio.gather(*tasks, return_exceptions=True)
+
+    report_index = 0
+    while stats["success"] < target_reports:
+        current_session = valid_sessions[report_index % total_sessions]
+        report_index += 1
+        await send_report(current_session, report_index, channel, msg_id, stats, error_log)
+        await asyncio.sleep(random.uniform(1.0, 2.0))
 
     summary = (
         f"📊 **Final Summary**\n"
         f"✅ Successful: {stats['success']}\n"
         f"❌ Failed: {stats['failed']}\n"
         f"📈 Sessions Used: {len(valid_sessions)}\n"
+        f"🎯 Target Achieved: {target_reports}\n"
         f"🕒 `{time.strftime('%Y-%m-%d %H:%M:%S')}`"
     )
     log(summary, "OK")
 
-    log("🏁 Reporting completed successfully. Staying alive for Heroku stability...", "INFO")
+    log("🏁 All reports sent successfully. Staying alive for Heroku stability...", "INFO")
     while True:
         log("💤 Idle heartbeat — app alive.", "INFO")
         await asyncio.sleep(60)
-
 
 # ======================================================
 # CRASH REPORTER
