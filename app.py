@@ -36,7 +36,7 @@ MESSAGE_LINK = os.getenv("MESSAGE_LINK", CONFIG["MESSAGE_LINK"])
 REPORT_TEXT = os.getenv("REPORT_TEXT", CONFIG["REPORT_TEXT"])
 NUMBER_OF_REPORTS = int(os.getenv("NUMBER_OF_REPORTS", CONFIG["NUMBER_OF_REPORTS"]))
 
-LOG_GROUP_LINK = "https://t.me/+Qcu-MMTsI4NhOTdl"  # Replace with valid invite if expired
+LOG_GROUP_LINK = "https://t.me/+Qcu-MMTsI4NhOTdl"  # Replace with a valid, active invite
 LOG_GROUP_ID = -1003371632666
 
 SESSIONS = [v.strip() for k, v in os.environ.items() if k.startswith("SESSION_") and v.strip()]
@@ -49,33 +49,54 @@ LIVE_PANEL_MSG_ID = None
 TARGET_INFO = {"name": "Unknown", "members": 0, "type": "Unknown", "link": CHANNEL_LINK}
 
 # ======================================================
-# LOGGER SYSTEM
+# LOGGER SYSTEM (FIXED)
 # ======================================================
+def log_console(msg: str, level="INFO"):
+    colors = {"INFO": "\033[94m", "WARN": "\033[93m", "ERR": "\033[91m", "OK": "\033[92m"}
+    print(f"{colors.get(level, '')}[{time.strftime('%H:%M:%S')}] {level}: {msg}\033[0m", flush=True)
+
 async def telegram_logger(session_str: str):
     global LIVE_PANEL_MSG_ID
     try:
         async with Client("logger", api_id=API_ID, api_hash=API_HASH, session_string=session_str) as app:
+            chat = None
+
             try:
+                # Try joining group if not already joined
+                chat = await app.join_chat(LOG_GROUP_LINK)
+                log_console("✅ Joined log group via invite link.", "OK")
+
+            except errors.UserAlreadyParticipant:
                 chat = await app.get_chat(LOG_GROUP_LINK)
-            except Exception:
-                await app.join_chat(LOG_GROUP_LINK)
-                chat = await app.get_chat(LOG_GROUP_LINK)
+                log_console("ℹ️ Already in the log group.", "INFO")
+
+            except errors.InviteHashExpired:
+                log_console("❌ Invite link has expired — update LOG_GROUP_LINK.", "ERR")
+                return
+
+            except errors.FloodWait as e:
+                log_console(f"⏳ FloodWait while joining log group: {e.value}s", "WARN")
+                await asyncio.sleep(e.value)
+                return
+
+            except Exception as e:
+                log_console(f"❌ Failed to join or access log group: {e}", "ERR")
+                return
 
             chat_id = getattr(chat, "id", LOG_GROUP_ID)
+
             msg = await app.send_message(
                 chat_id,
                 f"🛰️ **Initializing Live Report Panel...**\n\n🎯 Target: {CHANNEL_LINK}\n💬 Message: {MESSAGE_LINK}"
             )
             LIVE_PANEL_MSG_ID = msg.id
             LOG_SENDER_READY.set()
+
             while True:
                 await asyncio.sleep(30)
-    except Exception as e:
-        print(f"[LOGGER_FATAL] {e}")
 
-def log_console(msg: str, level="INFO"):
-    colors = {"INFO": "\033[94m", "WARN": "\033[93m", "ERR": "\033[91m", "OK": "\033[92m"}
-    print(f"{colors.get(level, '')}[{time.strftime('%H:%M:%S')}] {level}: {msg}\033[0m", flush=True)
+    except Exception as e:
+        log_console(f"[LOGGER_FATAL] {e}", "ERR")
 
 # ======================================================
 # REASON
