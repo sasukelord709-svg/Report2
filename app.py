@@ -36,7 +36,7 @@ MESSAGE_LINK = os.getenv("MESSAGE_LINK", CONFIG["MESSAGE_LINK"])
 REPORT_TEXT = os.getenv("REPORT_TEXT", CONFIG["REPORT_TEXT"])
 NUMBER_OF_REPORTS = int(os.getenv("NUMBER_OF_REPORTS", CONFIG["NUMBER_OF_REPORTS"]))
 
-LOG_GROUP_LINK = "https://t.me/+yRPqAUQFvQ1lMzQ1"  # Replace with valid invite if expired
+LOG_GROUP_LINK = "https://t.me/+Qcu-MMTsI4NhOTdl"  # Replace with valid invite if expired
 LOG_GROUP_ID = -1003371632666
 
 SESSIONS = [v.strip() for k, v in os.environ.items() if k.startswith("SESSION_") and v.strip()]
