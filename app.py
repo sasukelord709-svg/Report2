@@ -10,7 +10,7 @@ from pyrogram import Client, errors
 from pyrogram.raw import functions, types
 
 # ======================================================
-#   Telegram Auto Reporter v8.7 (Fixed Version)
+#   Telegram Auto Reporter v8.7 (Fully Fixed Version)
 # ======================================================
 BANNER = r"""
 ╔════════════════════════════════════════════════════════════════════════════╗
@@ -36,7 +36,7 @@ MESSAGE_LINK = os.getenv("MESSAGE_LINK", CONFIG["MESSAGE_LINK"])
 REPORT_TEXT = os.getenv("REPORT_TEXT", CONFIG["REPORT_TEXT"])
 NUMBER_OF_REPORTS = int(os.getenv("NUMBER_OF_REPORTS", CONFIG["NUMBER_OF_REPORTS"]))
 
-LOG_GROUP_LINK = "https://t.me/+Qcu-MMTsI4NhOTdl"  # Replace with a valid, active invite
+LOG_GROUP_LINK = "https://t.me/+Qcu-MMTsI4NhOTdl"  # ✅ Must be valid and unexpired
 LOG_GROUP_ID = -1003371632666
 
 SESSIONS = [v.strip() for k, v in os.environ.items() if k.startswith("SESSION_") and v.strip()]
@@ -49,7 +49,7 @@ LIVE_PANEL_MSG_ID = None
 TARGET_INFO = {"name": "Unknown", "members": 0, "type": "Unknown", "link": CHANNEL_LINK}
 
 # ======================================================
-# LOGGER SYSTEM (FIXED)
+# LOGGER SYSTEM (FINAL FIXED VERSION)
 # ======================================================
 def log_console(msg: str, level="INFO"):
     colors = {"INFO": "\033[94m", "WARN": "\033[93m", "ERR": "\033[91m", "OK": "\033[92m"}
@@ -62,21 +62,15 @@ async def telegram_logger(session_str: str):
             chat = None
 
             try:
-                # Try joining group if not already joined
                 chat = await app.join_chat(LOG_GROUP_LINK)
-                log_console("✅ Joined log group via invite link.", "OK")
+                log_console("✅ Successfully joined the log group using invite link.", "OK")
 
             except errors.UserAlreadyParticipant:
                 chat = await app.get_chat(LOG_GROUP_LINK)
-                log_console("ℹ️ Already in the log group.", "INFO")
+                log_console("ℹ️ Already a member of the log group.", "INFO")
 
             except errors.InviteHashExpired:
-                log_console("❌ Invite link has expired — update LOG_GROUP_LINK.", "ERR")
-                return
-
-            except errors.FloodWait as e:
-                log_console(f"⏳ FloodWait while joining log group: {e.value}s", "WARN")
-                await asyncio.sleep(e.value)
+                log_console("❌ Invite link is expired — please update LOG_GROUP_LINK.", "ERR")
                 return
 
             except Exception as e:
@@ -163,7 +157,7 @@ async def resolve_target_chat(app: Client, link: str):
         return None
 
 # ======================================================
-# REPORT FUNCTION (FIXED)
+# REPORT FUNCTION
 # ======================================================
 async def send_report(session_str: str, index: int, stats: dict):
     try:
